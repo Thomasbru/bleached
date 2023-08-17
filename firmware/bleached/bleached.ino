@@ -33,14 +33,17 @@
    Tools > USB Type > Serial + MIDI
 */
 
-// Map MIDI CC channels to knobs numbered left to right.
-#define CC01  102
-#define CC02  103
-#define CC03  104
-#define CC04  105
-#define CC05  106
-#define CC06  107
-#define CC07  108
+#include <EEPROM.h> // for mode to persist between read/writes
+
+// Map MIDI CC channels to knobs numbered left to right, defined as pairs.
+// First item MSB, second LSB
+#define CC01  {102, 103}
+#define CC02  {104, 105}
+#define CC03  {106, 107}
+#define CC04  {108, 109}
+#define CC05  {110, 111}
+#define CC06  {112, 113}
+#define CC07  {114, 115}
 
 // Map the TeensyLC pins to each potentiometer numbered left to right.
 #define POT01 0
@@ -51,9 +54,15 @@
 #define POT06 5
 #define POT07 6
 
-
 // Use this MIDI channel.
 #define MIDI_CHANNEL 1
+
+// modes
+#define EEPADDRESS 0
+
+bool setup_mode = false;
+bool bit_mode;
+
 
 // Send MIDI CC messages for all 7 knobs after the main loop runs this many times.
 // This prevents having to twiddle the knobs to update the receiving end.
@@ -61,7 +70,7 @@
 //#define LOOPS_PER_REFRESH 10000
 
 // potentiometer read parameters
-#define POT_BIT_RES         10 // 10 works, 7-16 is valid
+#define POT_BIT_RES         10 // 16 works, 7-16 is valid
 #define POT_NUM_READS       32 // 32 works
 
 // Track the knob state.
@@ -75,7 +84,7 @@ uint8_t pot[7] = {POT01,
                   };
 
 // an array of CC numbers
-uint8_t cc[7] = { CC01,
+uint8_t cc[7][2] = { CC01,
                   CC02, CC03, CC04, CC05, CC06, CC07
                  };
 
@@ -88,11 +97,21 @@ uint16_t loop_count = 0;
 
 void setup() {
   // serial monitoring for debugging
-  // Serial.begin(38400);
-
+  //Serial.begin(38400);
+  Serial.begin(9600);
   // potentiometers
+  
+  // READ MODE FROM EEPROM
+  bit_mode = EEPROM.read(EEPADDRESS);
+
   analogReadResolution(POT_BIT_RES);
   analogReadAveraging(POT_NUM_READS);
+  
+  // setup mode
+  check_for_setup();
+  if (setup_mode == true){
+    setup_function();
+  }
 }
 
 void loop() {
@@ -101,11 +120,13 @@ void loop() {
     uint16_t pot_val = analogRead(pot[i]);
     if ((pot_val < prev_pot_val[i] - nbrhd) ||
         (pot_val > prev_pot_val[i] + nbrhd)) {
-      usbMIDI.sendControlChange(cc[i], pot_val >> (POT_BIT_RES - 7), MIDI_CHANNEL);
+      usbMIDI.sendControlChange(cc[i][0], pot_val >> (POT_BIT_RES - 7), MIDI_CHANNEL); // MSB
+      if (bit_mode == true){
+        usbMIDI.sendControlChange(cc[i][1], pot_val & 127 , MIDI_CHANNEL); // Sends LSB if in 14 bit mode
+      }
       prev_pot_val[i] = pot_val;
     }
   }
-
   // MIDI Controllers should discard incoming MIDI messages.
   // (reference: https://www.pjrc.com/teensy/td_midi.html)
   while (usbMIDI.read()) { ;; }
@@ -119,4 +140,45 @@ void loop() {
 //    loop_count = 0;
 //  }
 //  loop_count++;
+}
+
+
+void check_for_setup(){
+  // checks if all knobs are CW. If so, enters setup_mode
+  for (uint8_t i = 0; i < 7; i++) {
+    uint16_t pot_val = analogRead(pot[i]);
+    if (pot_val < 1020) {
+      setup_mode = false;
+      break;
+    }
+    else{
+      setup_mode = true; 
+    }
+  }
+}
+
+void setup_function(){
+  // In setup mode:
+  // First pot sets byte mode: CW half (towards full) = 14 bit MIDI, CCW half (towards 0) = 8 bit midi
+  // Second pot CCW saves mode. To cancel, reboot Teensy.
+
+    while (setup_mode == true) {
+    for (uint8_t i = 0; i < 2; i++){
+      uint16_t pot_val = analogRead(pot[i]);
+      if (i == 0 && pot_val >= 500 && pot_val < 1020){
+        bit_mode = true;
+        }
+      else if (i == 0 && pot_val < 500){
+        bit_mode = false;
+      }
+      if (i == 1 and pot_val < 500){
+        // save to eeprom
+        EEPROM.write(EEPADDRESS, bit_mode);
+        setup_mode = false;
+      }
+    }
+    Serial.println(bit_mode);
+    Serial.println(setup_mode);
+    delay(500);
+  }
 }
