@@ -70,8 +70,13 @@ bool bit_mode;
 //#define LOOPS_PER_REFRESH 10000
 
 // potentiometer read parameters
-#define POT_BIT_RES         10 // 16 works, 7-16 is valid
+#define POT_BIT_RES         12 // 16 works, 7-16 is valid
 #define POT_NUM_READS       32 // 32 works
+
+// set threshold for entering setup mode, based on bit resolution. Max value of read minus some error margin.
+uint16_t setup_threshold = (1 << POT_BIT_RES) - POT_BIT_RES;
+// set threshold for mode, half of max resolution
+uint16_t mode_threshold = (1 << (POT_BIT_RES/2));
 
 // Track the knob state.
 uint16_t prev_pot_val[7] = {0xffff,
@@ -125,6 +130,7 @@ void loop() {
         usbMIDI.sendControlChange(cc[i][1], pot_val & 127 , MIDI_CHANNEL); // Sends LSB if in 14 bit mode
       }
       prev_pot_val[i] = pot_val;
+      Serial.println(pot_val);
     }
   }
   // MIDI Controllers should discard incoming MIDI messages.
@@ -147,7 +153,7 @@ void check_for_setup(){
   // checks if all knobs are CW. If so, enters setup_mode
   for (uint8_t i = 0; i < 7; i++) {
     uint16_t pot_val = analogRead(pot[i]);
-    if (pot_val < 1020) {
+    if (pot_val < setup_threshold) {
       setup_mode = false;
       break;
     }
@@ -165,13 +171,13 @@ void setup_function(){
     while (setup_mode == true) {
     for (uint8_t i = 0; i < 2; i++){
       uint16_t pot_val = analogRead(pot[i]);
-      if (i == 0 && pot_val >= 500 && pot_val < 1020){
+      if (i == 0 && pot_val >= mode_threshold && pot_val < setup_threshold){
         bit_mode = true;
         }
-      else if (i == 0 && pot_val < 500){
+      else if (i == 0 && pot_val < mode_threshold){
         bit_mode = false;
       }
-      if (i == 1 and pot_val < 500){
+      if (i == 1 and pot_val < mode_threshold){
         // save to eeprom
         EEPROM.write(EEPADDRESS, bit_mode);
         setup_mode = false;
