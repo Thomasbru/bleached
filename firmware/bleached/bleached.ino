@@ -102,8 +102,7 @@ uint16_t loop_count = 0;
 
 void setup() {
   // serial monitoring for debugging
-  //Serial.begin(38400);
-  Serial.begin(9600);
+  // Serial.begin(9600);
   // potentiometers
   
   // READ MODE FROM EEPROM
@@ -130,7 +129,6 @@ void loop() {
         usbMIDI.sendControlChange(cc[i][1], pot_val & 127 , MIDI_CHANNEL); // Sends LSB if in 14 bit mode
       }
       prev_pot_val[i] = pot_val;
-      Serial.println(pot_val);
     }
   }
   // MIDI Controllers should discard incoming MIDI messages.
@@ -183,8 +181,6 @@ void setup_function(){
         setup_mode = false;
       }
     }
-    Serial.println(bit_mode);
-    Serial.println(setup_mode);
     delay(500);
   }
 }
