@@ -22,6 +22,15 @@ the rest should be pretty easy, solder all the other headers to the teensy, sold
 
 next, add the metal standoffs, shorter ones on the bottom, taller ones on top. then screw in the panels. if you want the pots extra stable you can add the nuts and washers that come with the potentiometers. then plop on yr favorite knobs & yr golden !
 
+## Software
+Fake 14 bit mode added, plus possibility to swap between 7 and 14 bits / 1 or 2 midi channel resolution.
+(Teensy LC can only read 12 bits from pots, 3.2 can only read 13 bits. The result gets upscaled and passed as 14 bit.)
+
+To change mode, set all pots maximum CW and connect device. This puts the device in a setup mode.
+From there, the first pot sets bit mode. > 50% = 14 bit, < 50% 7 bit.
+To save the change, move the second pot CCW. This will exit the setup mode and return to regular operation.
+To cancel, power off device, move some knobs and reboot.
+
 ## FAQ
 
 q1) i don't have a 5-pin header for the top end of the teensy.
